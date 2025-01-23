@@ -66,6 +66,11 @@ fn main() -> anyhow::Result<()> {
         .filter_map(Result::ok)
         .collect();
 
+    anyhow::ensure!(
+        !terraform_files.is_empty(),
+        "no terraform files in directory"
+    );
+
     let modules = parse_module_definitions(terraform_files)?;
     let modules_json = ModulesJson::new(modules);
 
