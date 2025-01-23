@@ -1,0 +1,27 @@
+[package]
+name = "tfinit"
+authors = ["Dennis Frenken <dennis.frenken@centerdevice.com>"]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "terraform init for the impatient"
+
+[package.metadata.deb]
+assets = [
+    ["target/release/tfinit", "usr/bin/", "755"],
+    ["../target/complete/tfinit.bash", "usr/share/bash-completion/completions/", "755"],
+    ["../target/complete/tfinit.fish", "usr/share/fish/completions/", "755"],
+    ["../target/complete/_tfinit", "usr/share/zsh/vendor-completions/", "755"],
+    ["../target/man/tfinit.1", "usr/share/man/man1/", "755"],
+]
+
+[dependencies]
+clap.workspace = true
+
+anyhow = "1"
+glob = "0.3.2"
+hcl-rs = "0.18.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
