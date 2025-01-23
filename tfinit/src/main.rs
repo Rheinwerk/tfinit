@@ -8,6 +8,11 @@ fn main() -> anyhow::Result<()> {
         .with_env_filter(tracing_subscriber::EnvFilter::from_env("TFINIT_LOG"))
         .init();
 
+    tracing::info!(
+        cargo_version = env!("CARGO_PKG_VERSION"),
+        git_version = git_version::git_version!(),
+    );
+
     let cli: cli::Cli = clap::Parser::parse();
     tracing::trace!(?cli, "dumping command line arguments");
 

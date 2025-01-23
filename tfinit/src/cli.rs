@@ -1,5 +1,5 @@
 #[derive(clap::Parser, Debug)]
-#[clap(name = "tfinit", bin_name = "tfinit")]
+#[clap(name = "tfinit", bin_name = "tfinit", version, about)]
 /// terraform init for the impatient
 ///
 /// tfinit tries to mimic `terraform init -backend=false`

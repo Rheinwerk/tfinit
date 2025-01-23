@@ -20,6 +20,7 @@ assets = [
 clap.workspace = true
 
 anyhow = "1"
+git-version = "0.3"
 glob = "0.3.2"
 hcl-rs = "0.18.3"
 serde = { version = "1", features = ["derive"] }
