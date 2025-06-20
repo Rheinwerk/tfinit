@@ -11,8 +11,9 @@ install any plugins. The plugins have to be in the cache.
 - symlink `.terraform/providers` to
   the [terraform plugin cache](https://developer.hashicorp.com/terraform/cli/config/config-file#provider-plugin-cache)
 - write `.terraform/modules/modules.json`
+- take a list of paths as a file (`--batch <file>`) or from stdin (`--batch -`)
 
-Get the docker image `docker pull docker.io/rheinwerk/tfinit:0.1.0` or build locally.
+Get the docker image `docker pull docker.io/rheinwerk/tfinit:0.2.0` or build locally.
 
 ## Build
 

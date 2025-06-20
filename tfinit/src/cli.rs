@@ -12,6 +12,10 @@ pub struct Cli {
     #[clap(short = 'C', long)]
     pub directory: Option<String>,
 
+    /// Read paths from file, or stdin if path is -
+    #[clap(long)]
+    pub batch: Option<String>,
+
     /// override cache dir
     ///
     /// when no value is provided "plugin_cache" in ~/.terraformrc is used

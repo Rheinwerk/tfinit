@@ -1,7 +1,8 @@
 mod cli;
-use anyhow::Context;
+use anyhow::{bail, Context};
 use std::fmt::Formatter;
-use std::path::PathBuf;
+use std::io::BufRead;
+use std::path::{Path, PathBuf};
 
 fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::fmt()
@@ -15,25 +16,6 @@ fn main() -> anyhow::Result<()> {
 
     let cli: cli::Cli = clap::Parser::parse();
     tracing::trace!(?cli, "dumping command line arguments");
-
-    if let Some(new_cwd) = cli.directory {
-        std::env::set_current_dir(&new_cwd).context("failed changing work directory")?;
-        tracing::debug!(new_cwd, "changed work directory as requested");
-    }
-
-    if cli.clean {
-        if let Err(e) = std::fs::remove_dir_all(".terraform") {
-            // ignore NotFound errors
-            if !matches!(e.kind(), std::io::ErrorKind::NotFound) {
-                Err(e).context("failed to remove .terraform directory")?;
-            }
-        }
-    } else {
-        anyhow::ensure!(
-            !std::fs::exists(".terraform").unwrap_or_default(),
-            ".terraform already exists"
-        );
-    }
 
     let cache_dir: PathBuf = if let Some(cache_dir) = cli.cache_dir {
         tracing::debug!(cache_dir, "using cache dir from command line");
@@ -66,6 +48,82 @@ fn main() -> anyhow::Result<()> {
         cache_dir.into()
     };
 
+    match (cli.directory, cli.batch) {
+        (Some(_), Some(_)) => bail!("-C/--directory and --batch can not be used together"),
+        (dir, None) => do_for_path(
+            dir.map(PathBuf::from).as_deref(),
+            &cache_dir,
+            cli.clean,
+            cli.dry_run,
+        )?,
+        (None, Some(paths)) => {
+            let base_directory =
+                std::env::current_dir().context("failed getting current directory")?;
+
+            for path in read_paths(&paths)? {
+                let path = path.context("failed to parse line as path")?;
+                let path = PathBuf::from(path);
+
+                let path = if path.is_absolute() {
+                    path
+                } else {
+                    base_directory.join(path)
+                };
+
+                do_for_path(Some(&path), &cache_dir, cli.clean, cli.dry_run)?
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn read_paths(path: &str) -> anyhow::Result<Box<dyn Iterator<Item = anyhow::Result<String>>>> {
+    if path == "-" {
+        return Ok(Box::new(
+            std::io::stdin()
+                .lines()
+                .map(|r| r.map_err(anyhow::Error::from)),
+        ));
+    }
+
+    let paths = std::fs::File::open(path).context("unable to read batch file")?;
+    Ok(Box::new(
+        std::io::BufReader::new(paths)
+            .lines()
+            .map(|r| r.map_err(anyhow::Error::from)),
+    ))
+}
+
+#[tracing::instrument(skip(cache_dir, clean, dry_run))]
+fn do_for_path(
+    path: Option<&Path>,
+    cache_dir: &Path,
+    clean: bool,
+    dry_run: bool,
+) -> anyhow::Result<()> {
+    if let Some(new_cwd) = path {
+        std::env::set_current_dir(new_cwd).context("failed changing work directory")?;
+        tracing::debug!(
+            new_cwd = new_cwd.display().to_string(),
+            "changed work directory as requested"
+        );
+    }
+
+    if clean {
+        if let Err(e) = std::fs::remove_dir_all(".terraform") {
+            // ignore NotFound errors
+            if !matches!(e.kind(), std::io::ErrorKind::NotFound) {
+                Err(e).context("failed to remove .terraform directory")?;
+            }
+        }
+    } else {
+        anyhow::ensure!(
+            !std::fs::exists(".terraform").unwrap_or_default(),
+            ".terraform already exists"
+        );
+    }
+
     let terraform_files: Vec<_> = glob::glob("*.tf")
         .context("unable to search for terraform files")?
         .filter_map(Result::ok)
@@ -79,7 +137,7 @@ fn main() -> anyhow::Result<()> {
     let modules = parse_module_definitions(terraform_files)?;
     let modules_json = ModulesJson::new(modules);
 
-    if !cli.dry_run {
+    if !dry_run {
         create_dot_terraform_dir(modules_json, cache_dir)?;
     }
 
@@ -121,7 +179,10 @@ fn parse_module_definitions(files: Vec<PathBuf>) -> anyhow::Result<Vec<Module>> 
     Ok(modules)
 }
 
-fn create_dot_terraform_dir(modules: ModulesJson, cache_dir: PathBuf) -> anyhow::Result<()> {
+fn create_dot_terraform_dir(
+    modules: ModulesJson,
+    cache_dir: &std::path::Path,
+) -> anyhow::Result<()> {
     std::fs::create_dir_all(".terraform/modules").context("can not create .terraform directory")?;
 
     let file = std::fs::File::create(".terraform/modules/modules.json")
